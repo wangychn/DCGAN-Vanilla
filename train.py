@@ -49,15 +49,14 @@ def load_data(dataloader, device):
     plt.show()
 
 
-def train(netD, netG):
+def train(discriminator, generator):
 
     trainset = dset.ImageFolder(root=dataroot, 
-                            transform=transforms.Compose([
+                                transform=transforms.Compose([
                                 transforms.Resize(image_size),
                                 transforms.ToTensor(), 
                                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-                                ])
-                            )
+                                ]))
 
     dataloader = torch.utils.data.DataLoader(trainset, 
                                             batch_size=batch_size, 
@@ -77,8 +76,8 @@ def train(netD, netG):
     fake_label = 0.
 
     # Setup Adam optimizers for both G and D
-    optimizerD = optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
-    optimizerG = optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
+    optimizerD = optim.Adam(discriminator.parameters(), lr=lr, betas=(beta1, 0.999))
+    optimizerG = optim.Adam(generator.parameters(), lr=lr, betas=(beta1, 0.999))
 
     # <=============- Training loop -==============>
 
@@ -95,20 +94,73 @@ def train(netD, netG):
             # <================- Training Discriminator -=================>
             # Update D network: maximize log(D(x)) + log(1 - D(G(z)))
 
-            netD.zero_grad()
+            # <=========- Train with all-real batch
+            discriminator.zero_grad()
+            real_cpu = data[0].to(device)
+            b_size = real_cpu.size(0)
 
+            # 1D tensor of batch size with target label, which is all correct (1) 
+            label = torch.full((b_size,), real_label, dtype=torch.float, device=device)
+            
+            output_real = discriminator(real_cpu).view(-1)
+
+            errorD_real = criterion(output_real, label)
+
+            errorD_real.backward()
+            disc_real_mean = output_real.mean().item()
+
+            # <=========- Train with all-fake batch
+
+            noise = torch.randn(b_size, 1, 1, device=device)
+
+            fake = generator(noise)
+            label.fill_(fake_label)
+
+            # Classify the fake generations
+            output_fake = discriminator(real_cpu).view(-1)
+
+            errorD_fake = criterion(output_fake, label)
+
+            # NOTE: This is acculumated with previous gradients
+            errorD_fake.backward()
+            disc_fake_mean_pre = output_fake.mean().item()
+            errorD = errorD_fake + errorD_real # for stats
+
+            # Update D
+            optimizerD.step()
 
             # <================- Training Generator -=================>
             # Update G network: maximize log(D(G(z)))
 
-            netG.zero_grad()
+            generator.zero_grad()
 
+            label.fill_(real_label)
 
+            # Get new classifications for fake (the one we already made)
+            output = discriminator(fake).view(-1)
+
+            errorG = criterion(output, label)
+
+            errorG.backward()
+            disc_fake_mean_post = output.mean().item()
+
+            optimizerG.step()
+
+            # <=================- Training Stats -==================>
+            
+            if i % 50 == 0:
+                print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f'
+                    % (epoch, num_epochs, i, len(dataloader),
+                        errorD.item(), errorG.item(), disc_real_mean, 
+                        disc_fake_mean_pre, disc_fake_mean_post))
+
+            G_losses.append(errorG.item())
+            D_losses.append(errorD.item())
 
             # Check how the generator is doing by saving G's output on fixed_noise
-            if (iters % 500 == 0) or ((epoch == num_epochs-1) and (i == len(dataloader)-1)):
+            if (iters % 500 == 0) or ((epoch == num_epochs - 1) and (i == len(dataloader) - 1)):
                 with torch.no_grad():
-                    fake = netG(fixed_noise).detach().cpu()
+                    fake = generator(fixed_noise).detach().cpu()
                 img_list.append(torchvision.utils.make_grid(fake, padding=2, normalize=True))
 
             iters += 1
@@ -122,7 +174,6 @@ def main():
     random.seed(manualSeed)
     torch.manual_seed(manualSeed)
     torch.use_deterministic_algorithms(True)
-
 
     os.makedirs(dataroot, exist_ok=True)
 
