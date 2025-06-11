@@ -1,0 +1,32 @@
+import matplotlib.pyplot as plt
+from IPython import display
+import numpy as np
+import os
+
+plt.ion()
+
+def training_process_plot(G_losses, D_losses, plot_name, plot_path="plot"):
+    display.clear_output(wait=True)
+    display.display(plt.gcf())
+    plt.clf()
+    plt.title('Training...')
+    plt.xlabel('Number of Games')
+    plt.ylabel('Score')
+    plt.plot(G_losses)
+    plt.plot(D_losses)
+    plt.legend(['G_losses', 'D_losses'])
+    plt.ylim(ymin=0)
+    if G_losses:
+        plt.text(len(G_losses)-1, G_losses[-1], str(round(G_losses[-1], 4)), color='orange')
+    if D_losses:
+        plt.text(len(D_losses)-1, D_losses[-1], str(round(D_losses[-1], 4)), color='green')
+
+    plt.show(block=False)
+    plt.pause(.1)
+
+    # Save the plot every time it's updated
+    if plot_name != "":
+        print("SAVED GRAPH!")
+        plt.savefig(os.path.join(plot_path, plot_name))
+
+

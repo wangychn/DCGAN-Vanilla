@@ -15,11 +15,19 @@ import matplotlib.animation as animation
 
 import numpy as np
 
+from generator import Generator
+from discriminator import Discriminator
+
+from plot import training_process_plot
 
 # <===========- Meta Values -============>
 
 # Data loading
 dataroot = "data"
+model_folder_path = "./model"
+output_path = "./outputs"
+file_name = "model.pth"
+plot_path = "plots"
 image_size = 64
 num_workers = 0
 
@@ -40,6 +48,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # <======================================>
 
 
+
 def load_data(dataloader, device):
     real_batch = next(iter(dataloader))
     plt.figure(figsize=(8,8))
@@ -47,6 +56,12 @@ def load_data(dataloader, device):
     plt.title("Training Images")
     plt.imshow(np.transpose(torchvision.utils.make_grid(real_batch[0].to(device)[:64], padding=2, normalize=True).cpu(),(1,2,0)))
     plt.show()
+
+
+def save_img_list(img_list):
+    os.makedirs(output_path, exist_ok=True)
+    for idx, img in enumerate(img_list):
+        torchvision.utils.save_image(img, os.path.join(output_path, f"img_{idx:04d}.png"))
 
 
 def train(discriminator, generator):
@@ -89,7 +104,7 @@ def train(discriminator, generator):
     print("Starting Training Loop...")
 
     for epoch in range(num_epochs):
-        for i, data in enumerate(tqdm(dataloader), desc=f"Epoch {epoch + 1}/{num_epochs}"):
+        for i, data in enumerate(tqdm(dataloader, desc=f"Epoch {epoch + 1}/{num_epochs}")):
             
             # <================- Training Discriminator -=================>
             # Update D network: maximize log(D(x)) + log(1 - D(G(z)))
@@ -117,7 +132,7 @@ def train(discriminator, generator):
             label.fill_(fake_label)
 
             # Classify the fake generations
-            output_fake = discriminator(real_cpu).view(-1)
+            output_fake = discriminator(fake.detach()).view(-1)
 
             errorD_fake = criterion(output_fake, label)
 
@@ -157,6 +172,9 @@ def train(discriminator, generator):
             G_losses.append(errorG.item())
             D_losses.append(errorD.item())
 
+            # PLOT THE TRAINING PROCESS
+            training_process_plot(G_losses, D_losses, plot_path=plot_path, plot_name="training_plot.png")
+
             # Check how the generator is doing by saving G's output on fixed_noise
             if (iters % 500 == 0) or ((epoch == num_epochs - 1) and (i == len(dataloader) - 1)):
                 with torch.no_grad():
@@ -164,6 +182,8 @@ def train(discriminator, generator):
                 img_list.append(torchvision.utils.make_grid(fake, padding=2, normalize=True))
 
             iters += 1
+
+    return img_list, G_losses, D_losses
 
 
 
@@ -176,6 +196,34 @@ def main():
     torch.use_deterministic_algorithms(True)
 
     os.makedirs(dataroot, exist_ok=True)
+    os.makedirs(model_folder_path, exist_ok=True)
+
+
+    file_path = os.path.join(model_folder_path, file_name)
+
+    img_list = []
+    G_losses = []
+    D_losses = []
+
+    netG = Generator(pic_dim=pic_dim, feat_dim=feat_dim, latent_dim=latent_dim)
+    netD = Discriminator(pic_dim=pic_dim, feat_dim=feat_dim)
+
+    img_list, G_losses, D_losses = train(netG, netD)
+
+    # Save the model
+    torch.save({
+        'epoch': num_epochs,
+        'modelG_state_dict': netG.state_dict(),
+        'modelD_state_dict': netD.state_dict(),
+        'optimizerG_state_dict': optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999)).state_dict(),
+        'optimizerD_state_dict': optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999)).state_dict(),
+        'lossG': G_losses,
+        'lossD': D_losses
+    }, file_path)
+
+    save_img_list(img_list)
+
+
 
 
 
