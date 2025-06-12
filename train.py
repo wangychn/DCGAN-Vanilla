@@ -84,7 +84,7 @@ def train(discriminator, generator):
     criterion = nn.BCELoss()
 
     # Batch of latent random noise to visualize training progress
-    fixed_noise = torch.randn(64, pic_dim, 1, 1, device=device)
+    fixed_noise = torch.randn(64, latent_dim, 1, 1, device=device)
 
     # Establish convention for real and fake labels during training
     real_label = 1.
@@ -126,7 +126,7 @@ def train(discriminator, generator):
 
             # <=========- Train with all-fake batch
 
-            noise = torch.randn(b_size, 1, 1, device=device)
+            noise = torch.randn(b_size, latent_dim, 1, 1, device=device)
 
             fake = generator(noise)
             label.fill_(fake_label)
@@ -173,7 +173,7 @@ def train(discriminator, generator):
             D_losses.append(errorD.item())
 
             # PLOT THE TRAINING PROCESS
-            training_process_plot(G_losses, D_losses, plot_path=plot_path, plot_name="training_plot.png")
+            training_process_plot(G_losses, D_losses, plot_path=plot_path)
 
             # Check how the generator is doing by saving G's output on fixed_noise
             if (iters % 500 == 0) or ((epoch == num_epochs - 1) and (i == len(dataloader) - 1)):
@@ -183,6 +183,7 @@ def train(discriminator, generator):
 
             iters += 1
 
+    training_process_plot(G_losses, D_losses, plot_path=plot_path, plot_name="training_plot.png")
     return img_list, G_losses, D_losses
 
 
@@ -208,7 +209,7 @@ def main():
     netG = Generator(pic_dim=pic_dim, feat_dim=feat_dim, latent_dim=latent_dim)
     netD = Discriminator(pic_dim=pic_dim, feat_dim=feat_dim)
 
-    img_list, G_losses, D_losses = train(netG, netD)
+    img_list, G_losses, D_losses = train(netD, netG)
 
     # Save the model
     torch.save({

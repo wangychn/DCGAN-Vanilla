@@ -35,7 +35,7 @@ class Generator(nn.Module):
             nn.ReLU(inplace=True),
 
             nn.ConvTranspose2d(feat_dim * 4, feat_dim * 2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(feat_dim * 4),
+            nn.BatchNorm2d(feat_dim * 2),
             nn.ReLU(inplace=True),
 
             nn.ConvTranspose2d(feat_dim * 2, feat_dim, 4, 2, 1, bias=False),

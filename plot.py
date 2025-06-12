@@ -5,7 +5,7 @@ import os
 
 plt.ion()
 
-def training_process_plot(G_losses, D_losses, plot_name, plot_path="plot"):
+def training_process_plot(G_losses, D_losses, plot_path, plot_name=""):
     display.clear_output(wait=True)
     display.display(plt.gcf())
     plt.clf()
@@ -26,6 +26,7 @@ def training_process_plot(G_losses, D_losses, plot_name, plot_path="plot"):
 
     # Save the plot every time it's updated
     if plot_name != "":
+        os.makedirs(plot_path, exist_ok=True)
         print("SAVED GRAPH!")
         plt.savefig(os.path.join(plot_path, plot_name))
 
